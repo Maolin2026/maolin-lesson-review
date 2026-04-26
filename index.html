@@ -1528,7 +1528,26 @@ video {
   <body>
     <div id="root"></div>
 
-  <script type="module">(function polyfill() {
+  <script>
+// React error capture - must run before React
+window.__reactErrors = [];
+const origError = console.error;
+console.error = function() {
+    window.__reactErrors.push(Array.from(arguments).map(a => {
+        if (a instanceof Error) return a.stack || a.message;
+        if (typeof a === 'object') try { return JSON.stringify(a) } catch(e) { return String(a) }
+        return String(a);
+    }).join('\n'));
+    origError.apply(console, arguments);
+};
+window.addEventListener('error', function(e) {
+    window.__reactErrors.push('GLOBAL ERROR: ' + (e.error ? (e.error.stack || e.error.message) : e.message));
+});
+window.addEventListener('unhandledrejection', function(e) {
+    window.__reactErrors.push('UNHANDLED: ' + (e.reason && e.reason.stack ? e.reason.stack : String(e.reason)));
+});
+</script>
+<script type="module">(function polyfill() {
   const relList = document.createElement("link").relList;
   if (relList && relList.supports && relList.supports("modulepreload")) {
     return;
