@@ -1,26 +1,24 @@
 /**
- * DELETE /api/reviews/[id] - 删除评课记录（KV 版本）
+ * DELETE /api/reviews/[id] - 删除评课记录（jsonbox 版本）
  */
 export async function onRequestDelete(context) {
-  const { params, env } = context
-  const KV = env.REVIEWS
+  const { params, request, env } = context
   const id = params.id
 
   try {
-    const existing = await KV.get("reviews")
-    let reviews = []
-    try { reviews = existing ? JSON.parse(existing) : [] } catch { reviews = [] }
+    const masterKey = env.JSONBOX_MASTER_KEY || ""
+    const JSONBOX_BASE = "https://jsonbox.io"
+    const BOX_ID = "box_maolin_reviews_2026"
+    const headers = {}
+    if (masterKey) headers["X-Master-Key"] = masterKey
 
-    const index = reviews.findIndex(r => r.id === id)
-    if (index === -1) {
-      return new Response(JSON.stringify({ success: false, error: '记录不存在' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    // jsonbox 删除需要用 DELETE 方法 + 记录 _id
+    const boxUrl = JSONBOX_BASE + "/" + BOX_ID + "/" + id
+    const response = await fetch(boxUrl, { method: "DELETE", headers })
+
+    if (!response.ok && response.status !== 404) {
+      throw new Error("jsonbox 删除失败: " + response.status)
     }
-
-    reviews.splice(index, 1)
-    await KV.put("reviews", JSON.stringify(reviews))
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },

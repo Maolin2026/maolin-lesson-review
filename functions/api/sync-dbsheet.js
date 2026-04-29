@@ -1,13 +1,13 @@
 /**
- * POST /api/sync-dbsheet - 从 KV 获取未同步的评课记录
- * POST /api/sync-dbsheet/confirm - 确认已同步，标记记录
+ * POST /api/sync-dbsheet - 从 jsonbox 获取未同步的评课记录
  *
  * 调用方：灵犀 AI 定时任务
- * 认证：X-Sync-Key 请求头匹配环境变量 SYNC_KEY
  */
+const JSONBOX_BASE = "https://jsonbox.io"
+const BOX_ID = "box_maolin_reviews_2026"
+
 export async function onRequestPost(context) {
   const { request, env } = context
-  const KV = env.REVIEWS
 
   try {
     const syncKey = request.headers.get('X-Sync-Key')
@@ -18,9 +18,17 @@ export async function onRequestPost(context) {
       })
     }
 
-    const existing = await KV.get("reviews")
-    let reviews = []
-    try { reviews = existing ? JSON.parse(existing) : [] } catch { reviews = [] }
+    const masterKey = env.JSONBOX_MASTER_KEY || ""
+    const headers = {}
+    if (masterKey) headers["X-Master-Key"] = masterKey
+
+    const response = await fetch(JSONBOX_BASE + "/" + BOX_ID, { headers })
+    if (!response.ok) {
+      throw new Error("jsonbox 读取失败: " + response.status)
+    }
+
+    let reviews = await response.json()
+    if (!Array.isArray(reviews)) reviews = []
 
     const unsynced = reviews.filter(r => !r.dbsheet_synced)
 
@@ -36,7 +44,7 @@ export async function onRequestPost(context) {
     }
 
     const records = unsynced.map(r => ({
-      id: r.id,
+      id: r._id || r.id,
       topic: r.topic,
       teacherName: r.teacher_name,
       grade: r.grade,

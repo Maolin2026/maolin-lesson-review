@@ -1,12 +1,14 @@
 /**
- * POST /api/sync-dbsheet/confirm - 标记记录为已同步（KV 版本）
+ * POST /api/sync-dbsheet/confirm - 标记记录为已同步（jsonbox 版本）
  *
+ * 通过更新 jsonbox 中记录的 dbsheet_synced 字段实现
  * 请求体: { "ids": ["R...", "R...", ...] }
- * 认证: X-Sync-Key 请求头
  */
+const JSONBOX_BASE = "https://jsonbox.io"
+const BOX_ID = "box_maolin_reviews_2026"
+
 export async function onRequestPost(context) {
   const { request, env } = context
-  const KV = env.REVIEWS
 
   try {
     const syncKey = request.headers.get('X-Sync-Key')
@@ -27,19 +29,30 @@ export async function onRequestPost(context) {
       })
     }
 
-    const existing = await KV.get("reviews")
-    let reviews = []
-    try { reviews = existing ? JSON.parse(existing) : [] } catch { reviews = [] }
+    const masterKey = env.JSONBOX_MASTER_KEY || ""
+    const headers = { "Content-Type": "application/json" }
+    if (masterKey) headers["X-Master-Key"] = masterKey
+
+    // jsonbox 通过 PUT 更新记录
+    // 先读取所有记录，找到需要更新的
+    const response = await fetch(JSONBOX_BASE + "/" + BOX_ID, { headers: { "X-Master-Key": masterKey } })
+    let reviews = await response.json()
+    if (!Array.isArray(reviews)) reviews = []
 
     let marked = 0
     for (const r of reviews) {
-      if (ids.includes(r.id)) {
+      const rid = r._id || r.id
+      if (ids.includes(rid)) {
         r.dbsheet_synced = true
+        // 用 PUT 更新
+        await fetch(JSONBOX_BASE + "/" + BOX_ID + "/" + rid, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(r),
+        })
         marked++
       }
     }
-
-    await KV.put("reviews", JSON.stringify(reviews))
 
     return new Response(JSON.stringify({
       success: true,

@@ -1,16 +1,30 @@
 /**
- * POST /api/reviews - 新增评课记录（存入 KV）
- * GET  /api/reviews - 获取全部评课记录（KV list）
- *   支持 ?grade=&type=&teacherId= 筛选
+ * POST /api/reviews - 新增评课记录
+ * GET  /api/reviews - 获取全部评课记录
  *
- * 数据存储在 Cloudflare KV 中
- * KV namespace binding: REVIEWS
- * 键设计: reviews - 存储所有记录的 JSON 数组
+ * 使用 jsonbox.io 作为存储后端（免费，无需配置）
+ * 数据通过 Cloudflare Pages Function 代理访问 jsonbox
  */
+
+const JSONBOX_BASE = "https://jsonbox.io"
+
+// jsonbox.io box ID - 创建后填入
+// 如果需要更换，修改此常量即可
+const BOX_ID = "box_maolin_reviews_2026"
+
+/**
+ * 从请求头或环境变量获取 jsonbox master key
+ */
+function getMasterKey(request, env) {
+  // 优先从请求头获取（前端提交时带上）
+  const headerKey = request.headers.get("X-Jsonbox-Key")
+  if (headerKey) return headerKey
+  // 其次从环境变量获取
+  return env.JSONBOX_MASTER_KEY || ""
+}
 
 export async function onRequestPost(context) {
   const { request, env } = context
-  const KV = env.REVIEWS
 
   try {
     const body = await request.json()
@@ -29,8 +43,8 @@ export async function onRequestPost(context) {
     const passed = body.totalScore >= (body.passScore || 85)
     const now = new Date().toISOString()
 
-    const newRecord = {
-      id,
+    const record = {
+      _id: id,
       topic: body.topic,
       teacher_id: body.teacherId || '',
       teacher_name: body.teacherName,
@@ -50,31 +64,38 @@ export async function onRequestPost(context) {
       created_at: now,
     }
 
-    // 读取现有记录，追加新记录
-    const existing = await KV.get("reviews")
-    let reviews = []
-    try { reviews = existing ? JSON.parse(existing) : [] } catch { reviews = [] }
+    // 写入 jsonbox
+    const masterKey = getMasterKey(request, env)
+    const boxUrl = JSONBOX_BASE + "/" + BOX_ID
+    const headers = { "Content-Type": "application/json" }
+    if (masterKey) headers["X-Master-Key"] = masterKey
 
-    reviews.unshift(newRecord)
+    const response = await fetch(boxUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(record),
+    })
 
-    // 写回 KV
-    await KV.put("reviews", JSON.stringify(reviews))
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error("jsonbox 写入失败: " + response.status + " " + errText)
+    }
 
     const reviewResponse = {
       id,
-      topic: newRecord.topic,
-      teacherId: newRecord.teacher_id,
-      teacherName: newRecord.teacher_name,
-      grade: newRecord.grade,
-      classType: newRecord.class_type,
-      type: newRecord.type,
-      subject: newRecord.subject,
-      reviewerName: newRecord.reviewer_name,
-      totalScore: newRecord.total_score,
-      dimensions: newRecord.dimensions,
-      overallComment: newRecord.overall_comment,
-      suggestions: newRecord.suggestions,
-      highlights: newRecord.highlights,
+      topic: record.topic,
+      teacherId: record.teacher_id,
+      teacherName: record.teacher_name,
+      grade: record.grade,
+      classType: record.class_type,
+      type: record.type,
+      subject: record.subject,
+      reviewerName: record.reviewer_name,
+      totalScore: record.total_score,
+      dimensions: record.dimensions,
+      overallComment: record.overall_comment,
+      suggestions: record.suggestions,
+      highlights: record.highlights,
       createdAt: now,
       status: 'completed',
     }
@@ -92,7 +113,6 @@ export async function onRequestPost(context) {
 
 export async function onRequestGet(context) {
   const { request, env } = context
-  const KV = env.REVIEWS
 
   try {
     const url = new URL(request.url)
@@ -101,9 +121,19 @@ export async function onRequestGet(context) {
     const teacherId = url.searchParams.get('teacherId') || ''
     const unsyncedOnly = url.searchParams.get('unsynced') === '1'
 
-    const existing = await KV.get("reviews")
-    let reviews = []
-    try { reviews = existing ? JSON.parse(existing) : [] } catch { reviews = [] }
+    const masterKey = getMasterKey(request, env)
+    const boxUrl = JSONBOX_BASE + "/" + BOX_ID
+    const headers = {}
+    if (masterKey) headers["X-Master-Key"] = masterKey
+
+    const response = await fetch(boxUrl, { headers })
+    if (!response.ok) {
+      throw new Error("jsonbox 读取失败: " + response.status)
+    }
+
+    let reviews = await response.json()
+    // jsonbox 返回的是数组
+    if (!Array.isArray(reviews)) reviews = []
 
     // 筛选
     if (grade) reviews = reviews.filter(r => r.grade === grade)
@@ -111,26 +141,10 @@ export async function onRequestGet(context) {
     if (teacherId) reviews = reviews.filter(r => r.teacher_id === teacherId)
     if (unsyncedOnly) reviews = reviews.filter(r => !r.dbsheet_synced)
 
-    // 转换为前端格式
-    const result = reviews.map(r => ({
-      id: r.id,
-      topic: r.topic,
-      teacher_id: r.teacher_id,
-      teacher_name: r.teacher_name,
-      grade: r.grade,
-      class_type: r.class_type,
-      type: r.type,
-      subject: r.subject,
-      total_score: r.total_score,
-      dimensions: r.dimensions || [],
-      overall_comment: r.overall_comment || '',
-      suggestions: r.suggestions || [],
-      highlights: r.highlights || [],
-      dbsheet_synced: r.dbsheet_synced || false,
-      created_at: r.created_at,
-    }))
+    // 按创建时间倒序
+    reviews.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 
-    return new Response(JSON.stringify({ success: true, reviews: result }), {
+    return new Response(JSON.stringify({ success: true, reviews }), {
       headers: { 'Content-Type': 'application/json' },
     })
   } catch (err) {
