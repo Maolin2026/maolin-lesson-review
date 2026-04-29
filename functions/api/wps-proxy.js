@@ -2,10 +2,10 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   
   try {
-    // 从环境变量获取 WPS SID
-    const wpsSid = env.VITE_WPS_SID;
+    // 从环境变量获取 WPS SID，优先使用 Cloudflare 环境变量
+    const wpsSid = env.VITE_WPS_SID || "V02SfNMKcDSVeAetGrp5cVY0ZYjVV_w00aba7971003c0fd770";
     if (!wpsSid) {
-      return new Response(JSON.stringify({ code: -1, msg: "WPS_SID 环境变量未配置" }), {
+      return new Response(JSON.stringify({ code: -1, msg: "WPS_SID 未配置" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
       });
