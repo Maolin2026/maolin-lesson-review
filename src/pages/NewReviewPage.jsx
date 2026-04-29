@@ -11,8 +11,6 @@ import {
   ArrowLeft, ChevronRight, X, Star, Lightbulb, Database, CloudOff
 } from "lucide-react"
 
-const ICON_MAP = { FileText, Hammer, Video }
-
 export default function NewReviewPage() {
   const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
@@ -166,9 +164,11 @@ export default function NewReviewPage() {
           <div>
             <label className="label-text">类型</label>
             <div className="flex gap-3 mt-2">
-              {REVIEW_TYPE_OPTIONS.map(t => {
-                const IconComponent = ICON_MAP[t.iconKey]
-                return (
+              {[
+                { value: "lesson_plan", label: "评教案", icon: FileText, desc: "评审教师教案设计（茂林磨课标准）" },
+                { value: "lesson_polish", label: "评磨课", icon: Hammer, desc: "评审磨课过程（茂林磨课标准）" },
+                { value: "class_recording", label: "评实录", icon: Video, desc: "评审课堂实录记录（茂林好课标准）" },
+              ].map(t => (
                 <button
                   key={t.value}
                   onClick={() => setFormData(f => ({ ...f, type: t.value }))}
@@ -178,12 +178,11 @@ export default function NewReviewPage() {
                       : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
-                  <IconComponent className={`w-6 h-6 mb-2 ${formData.type === t.value ? "text-primary-600" : "text-gray-400"}`} />
+                  <t.icon className={`w-6 h-6 mb-2 ${formData.type === t.value ? "text-primary-600" : "text-gray-400"}`} />
                   <p className={`font-medium ${formData.type === t.value ? "text-primary-700" : "text-gray-700"}`}>{t.label}</p>
                   <p className="text-xs text-gray-500 mt-1">{t.desc}</p>
                 </button>
-                )
-              })}
+              ))}
             </div>
           </div>
 
