@@ -2,8 +2,6 @@
 // 茂林磨课19条标准（满分100分）—— 用于评教案、评磨课
 // 茂林好课21条标准（满分100分）—— 用于评实录
 
-import { FileText, Hammer, Video } from "lucide-react"
-
 // ==================== 茂林磨课标准（19条，100分） ====================
 export const REVIEW_DIMENSIONS = [
   {
@@ -166,9 +164,9 @@ export const REVIEW_TYPES = {
 
 // 评课类型配置（含图标和描述）
 export const REVIEW_TYPE_OPTIONS = [
-  { value: "lesson_plan", label: "评教案", icon: FileText, desc: "评审教师教案设计（茂林磨课标准）" },
-  { value: "lesson_polish", label: "评磨课", icon: Hammer, desc: "评审磨课过程（茂林磨课标准）" },
-  { value: "class_recording", label: "评实录", icon: Video, desc: "评审课堂实录记录（茂林好课标准）" },
+  { value: "lesson_plan", label: "评教案", iconKey: "FileText", desc: "评审教师教案设计（茂林磨课标准）" },
+  { value: "lesson_polish", label: "评磨课", iconKey: "Hammer", desc: "评审磨课过程（茂林磨课标准）" },
+  { value: "class_recording", label: "评实录", iconKey: "Video", desc: "评审课堂实录记录（茂林好课标准）" },
 ]
 
 // 达标线
@@ -220,4 +218,5 @@ ${standardList}
   "overallComment": "<总体评语>",
   "suggestions": ["<改进建议1>", "<改进建议2>", "<改进建议3>"],
   "highlights": ["<亮点1>", "<亮点2>"]
-}`''
+}`
+}

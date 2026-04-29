@@ -7,7 +7,7 @@ import useSettingsStore from "../stores/settingsStore"
 import { callZhipuReview } from "../api/zhipu"
 import { REVIEW_TYPES, REVIEW_DIMENSIONS, REVIEW_TYPE_OPTIONS, PASS_SCORE } from "../data/reviewStandards"
 import {
-  Loader2, AlertCircle, CheckCircle2,
+  FileText, Hammer, Video, Loader2, AlertCircle, CheckCircle2,
   ArrowLeft, ChevronRight, X, Star, Lightbulb, Database, CloudOff
 } from "lucide-react"
 
@@ -164,7 +164,9 @@ export default function NewReviewPage() {
           <div>
             <label className="label-text">类型</label>
             <div className="flex gap-3 mt-2">
-              {REVIEW_TYPE_OPTIONS.map(t => (
+              {REVIEW_TYPE_OPTIONS.map(t => {
+                const IconComponent = ICON_MAP[t.iconKey]
+                return (
                 <button
                   key={t.value}
                   onClick={() => setFormData(f => ({ ...f, type: t.value }))}
@@ -174,11 +176,12 @@ export default function NewReviewPage() {
                       : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
-                  <t.icon className={`w-6 h-6 mb-2 ${formData.type === t.value ? "text-primary-600" : "text-gray-400"}`} />
+                  <IconComponent className={`w-6 h-6 mb-2 ${formData.type === t.value ? "text-primary-600" : "text-gray-400"}`} />
                   <p className={`font-medium ${formData.type === t.value ? "text-primary-700" : "text-gray-700"}`}>{t.label}</p>
                   <p className="text-xs text-gray-500 mt-1">{t.desc}</p>
                 </button>
-              ))}
+                )
+              })}
             </div>
           </div>
 
