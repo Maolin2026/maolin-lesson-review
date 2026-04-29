@@ -1,17 +1,15 @@
 /**
- * POST /api/sync-dbsheet - 从 D1 读取未同步的评课记录，写入 WPS 多维表
+ * POST /api/sync-dbsheet - 从 KV 获取未同步的评课记录
+ * POST /api/sync-dbsheet/confirm - 确认已同步，标记记录
  *
- * 调用方：灵犀 AI 定时任务（或手动触发）
- * 认证：需要 X-Sync-Key 请求头匹配环境变量 SYNC_KEY
- *
- * 成功写入后标记 dbsheet_synced = 1，避免重复写入
+ * 调用方：灵犀 AI 定时任务
+ * 认证：X-Sync-Key 请求头匹配环境变量 SYNC_KEY
  */
 export async function onRequestPost(context) {
   const { request, env } = context
-  const DB = env.DB
+  const KV = env.REVIEWS
 
   try {
-    // 认证检查
     const syncKey = request.headers.get('X-Sync-Key')
     if (!syncKey || syncKey !== (env.SYNC_KEY || 'maolin-sync-2026')) {
       return new Response(JSON.stringify({ success: false, error: '认证失败' }), {
@@ -20,24 +18,24 @@ export async function onRequestPost(context) {
       })
     }
 
-    // 查询未同步的记录
-    const { results } = await DB.prepare(
-      'SELECT * FROM reviews WHERE dbsheet_synced = 0 ORDER BY created_at ASC'
-    ).all()
+    const existing = await KV.get("reviews")
+    let reviews = []
+    try { reviews = existing ? JSON.parse(existing) : [] } catch { reviews = [] }
 
-    if (!results.length) {
+    const unsynced = reviews.filter(r => !r.dbsheet_synced)
+
+    if (!unsynced.length) {
       return new Response(JSON.stringify({
         success: true,
         message: '没有需要同步的记录',
+        records: [],
         synced: 0,
       }), {
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
-    // 调用灵犀的 dbsheet 服务写入多维表
-    // 实际写入由灵犀代理完成，此处返回需要同步的数据
-    const records = results.map(r => ({
+    const records = unsynced.map(r => ({
       id: r.id,
       topic: r.topic,
       teacherName: r.teacher_name,
@@ -46,16 +44,16 @@ export async function onRequestPost(context) {
       type: r.type,
       reviewerName: r.reviewer_name,
       totalScore: r.total_score,
-      passed: r.passed === 1,
+      passed: r.passed,
       reviewDate: r.created_at ? r.created_at.split('T')[0] : '',
-      dimensions: JSON.parse(r.dimensions || '[]'),
-      overallComment: r.overall_comment,
-      suggestions: JSON.parse(r.suggestions || '[]'),
+      dimensions: r.dimensions || [],
+      overallComment: r.overall_comment || '',
+      suggestions: r.suggestions || [],
     }))
 
     return new Response(JSON.stringify({
       success: true,
-      message: `找到 ${records.length} 条待同步记录`,
+      message: '找到 ' + records.length + ' 条待同步记录',
       records,
       synced: 0,
     }), {
@@ -67,22 +65,4 @@ export async function onRequestPost(context) {
       headers: { 'Content-Type': 'application/json' },
     })
   }
-}
-
-/**
- * POST /api/sync-dbsheet/confirm - 确认已同步，标记记录为已同步
- */
-export async function onRequest(context) {
-  // 此路由处理 /api/sync-dbsheet/confirm 的 POST 请求
-  if (context.request.method !== 'POST') {
-    return new Response(JSON.stringify({ success: false, error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-  // 实际 confirm 逻辑通过单独的路由处理
-  return new Response(JSON.stringify({ success: false, error: '请使用 /api/sync-dbsheet/confirm 端点' }), {
-    status: 400,
-    headers: { 'Content-Type': 'application/json' },
-  })
 }

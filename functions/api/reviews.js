@@ -1,74 +1,85 @@
 /**
- * POST /api/reviews - 新增评课记录
- * GET  /api/reviews - 获取评课记录列表（支持 ?grade=&type=&teacherId= 筛选）
+ * POST /api/reviews - 新增评课记录（存入 KV）
+ * GET  /api/reviews - 获取全部评课记录（KV list）
+ *   支持 ?grade=&type=&teacherId= 筛选
  *
- * 数据存储在 Cloudflare D1 数据库中
+ * 数据存储在 Cloudflare KV 中
+ * KV namespace binding: REVIEWS
+ * 键设计: reviews - 存储所有记录的 JSON 数组
  */
+
 export async function onRequestPost(context) {
   const { request, env } = context
-  const DB = env.DB
+  const KV = env.REVIEWS
 
   try {
     const body = await request.json()
 
-    // 必填字段校验
     const required = ['topic', 'teacherName', 'grade', 'classType', 'type', 'reviewerName', 'totalScore']
     for (const field of required) {
       if (!body[field] && body[field] !== 0) {
-        return new Response(JSON.stringify({ success: false, error: `缺少必填字段: ${field}` }), {
+        return new Response(JSON.stringify({ success: false, error: "缺少必填字段: " + field }), {
           status: 400,
           headers: { 'Content-Type': 'application/json' },
         })
       }
     }
 
-    const id = `R${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+    const id = "R" + Date.now() + "_" + Math.random().toString(36).substr(2, 6)
     const passed = body.totalScore >= (body.passScore || 85)
     const now = new Date().toISOString()
 
-    // 维度评分 JSON 序列化
-    const dimensionsJson = body.dimensions ? JSON.stringify(body.dimensions) : '[]'
-    // 建议列表 JSON 序列化
-    const suggestionsJson = body.suggestions ? JSON.stringify(body.suggestions) : '[]'
-
-    await DB.prepare(`
-      INSERT INTO reviews (
-        id, topic, teacher_id, teacher_name, grade, class_type, type,
-        subject, reviewer_name, total_score, passed, pass_score,
-        dimensions, overall_comment, suggestions, highlights,
-        dbsheet_synced, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
+    const newRecord = {
       id,
-      body.topic,
-      body.teacherId || '',
-      body.teacherName,
-      body.grade,
-      body.classType,
-      body.type,
-      body.subject || '数学',
-      body.reviewerName,
-      body.totalScore,
-      passed ? 1 : 0,
-      body.passScore || 85,
-      dimensionsJson,
-      body.overallComment || '',
-      suggestionsJson,
-      body.highlights ? JSON.stringify(body.highlights) : '[]',
-      0,
-      now
-    ).run()
+      topic: body.topic,
+      teacher_id: body.teacherId || '',
+      teacher_name: body.teacherName,
+      grade: body.grade,
+      class_type: body.classType,
+      type: body.type,
+      subject: body.subject || '数学',
+      reviewer_name: body.reviewerName,
+      total_score: body.totalScore,
+      passed,
+      pass_score: body.passScore || 85,
+      dimensions: body.dimensions || [],
+      overall_comment: body.overallComment || '',
+      suggestions: body.suggestions || [],
+      highlights: body.highlights || [],
+      dbsheet_synced: false,
+      created_at: now,
+    }
 
-    return new Response(JSON.stringify({
-      success: true,
-      review: {
-        id,
-        ...body,
-        passed,
-        createdAt: now,
-        status: 'completed',
-      }
-    }), {
+    // 读取现有记录，追加新记录
+    const existing = await KV.get("reviews")
+    let reviews = []
+    try { reviews = existing ? JSON.parse(existing) : [] } catch { reviews = [] }
+
+    reviews.unshift(newRecord)
+
+    // 写回 KV
+    await KV.put("reviews", JSON.stringify(reviews))
+
+    const reviewResponse = {
+      id,
+      topic: newRecord.topic,
+      teacherId: newRecord.teacher_id,
+      teacherName: newRecord.teacher_name,
+      grade: newRecord.grade,
+      classType: newRecord.class_type,
+      type: newRecord.type,
+      subject: newRecord.subject,
+      reviewerName: newRecord.reviewer_name,
+      totalScore: newRecord.total_score,
+      dimensions: newRecord.dimensions,
+      overallComment: newRecord.overall_comment,
+      suggestions: newRecord.suggestions,
+      highlights: newRecord.highlights,
+      createdAt: now,
+      status: 'completed',
+    }
+
+    return new Response(JSON.stringify({ success: true, review: reviewResponse }), {
       headers: { 'Content-Type': 'application/json' },
     })
   } catch (err) {
@@ -81,7 +92,7 @@ export async function onRequestPost(context) {
 
 export async function onRequestGet(context) {
   const { request, env } = context
-  const DB = env.DB
+  const KV = env.REVIEWS
 
   try {
     const url = new URL(request.url)
@@ -89,42 +100,37 @@ export async function onRequestGet(context) {
     const type = url.searchParams.get('type') || ''
     const teacherId = url.searchParams.get('teacherId') || ''
     const unsyncedOnly = url.searchParams.get('unsynced') === '1'
-    const limit = parseInt(url.searchParams.get('limit')) || 200
 
-    let query = 'SELECT * FROM reviews WHERE 1=1'
-    const params = []
+    const existing = await KV.get("reviews")
+    let reviews = []
+    try { reviews = existing ? JSON.parse(existing) : [] } catch { reviews = [] }
 
-    if (grade) {
-      query += ' AND grade = ?'
-      params.push(grade)
-    }
-    if (type) {
-      query += ' AND type = ?'
-      params.push(type)
-    }
-    if (teacherId) {
-      query += ' AND teacher_id = ?'
-      params.push(teacherId)
-    }
-    if (unsyncedOnly) {
-      query += ' AND dbsheet_synced = 0'
-    }
+    // 筛选
+    if (grade) reviews = reviews.filter(r => r.grade === grade)
+    if (type) reviews = reviews.filter(r => r.type === type)
+    if (teacherId) reviews = reviews.filter(r => r.teacher_id === teacherId)
+    if (unsyncedOnly) reviews = reviews.filter(r => !r.dbsheet_synced)
 
-    query += ' ORDER BY created_at DESC LIMIT ?'
-    params.push(limit)
-
-    const { results } = await DB.prepare(query).bind(...params).all()
-
-    // 解析 JSON 字段
-    const reviews = results.map(r => ({
-      ...r,
-      dimensions: JSON.parse(r.dimensions || '[]'),
-      suggestions: JSON.parse(r.suggestions || '[]'),
-      highlights: JSON.parse(r.highlights || '[]'),
-      passed: r.passed === 1,
+    // 转换为前端格式
+    const result = reviews.map(r => ({
+      id: r.id,
+      topic: r.topic,
+      teacher_id: r.teacher_id,
+      teacher_name: r.teacher_name,
+      grade: r.grade,
+      class_type: r.class_type,
+      type: r.type,
+      subject: r.subject,
+      total_score: r.total_score,
+      dimensions: r.dimensions || [],
+      overall_comment: r.overall_comment || '',
+      suggestions: r.suggestions || [],
+      highlights: r.highlights || [],
+      dbsheet_synced: r.dbsheet_synced || false,
+      created_at: r.created_at,
     }))
 
-    return new Response(JSON.stringify({ success: true, reviews }), {
+    return new Response(JSON.stringify({ success: true, reviews: result }), {
       headers: { 'Content-Type': 'application/json' },
     })
   } catch (err) {

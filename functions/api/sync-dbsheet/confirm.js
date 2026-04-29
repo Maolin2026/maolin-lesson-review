@@ -1,15 +1,14 @@
 /**
- * POST /api/sync-dbsheet/confirm - 确认记录已写入多维表，标记为已同步
+ * POST /api/sync-dbsheet/confirm - 标记记录为已同步（KV 版本）
  *
  * 请求体: { "ids": ["R...", "R...", ...] }
  * 认证: X-Sync-Key 请求头
  */
 export async function onRequestPost(context) {
   const { request, env } = context
-  const DB = env.DB
+  const KV = env.REVIEWS
 
   try {
-    // 认证检查
     const syncKey = request.headers.get('X-Sync-Key')
     if (!syncKey || syncKey !== (env.SYNC_KEY || 'maolin-sync-2026')) {
       return new Response(JSON.stringify({ success: false, error: '认证失败' }), {
@@ -28,14 +27,23 @@ export async function onRequestPost(context) {
       })
     }
 
-    // 批量标记为已同步
-    for (const id of ids) {
-      await DB.prepare('UPDATE reviews SET dbsheet_synced = 1 WHERE id = ?').bind(id).run()
+    const existing = await KV.get("reviews")
+    let reviews = []
+    try { reviews = existing ? JSON.parse(existing) : [] } catch { reviews = [] }
+
+    let marked = 0
+    for (const r of reviews) {
+      if (ids.includes(r.id)) {
+        r.dbsheet_synced = true
+        marked++
+      }
     }
+
+    await KV.put("reviews", JSON.stringify(reviews))
 
     return new Response(JSON.stringify({
       success: true,
-      message: `已标记 ${ids.length} 条记录为已同步`,
+      message: '已标记 ' + marked + ' 条记录为已同步',
     }), {
       headers: { 'Content-Type': 'application/json' },
     })
