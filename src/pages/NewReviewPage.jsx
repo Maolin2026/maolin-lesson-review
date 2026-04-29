@@ -11,6 +11,8 @@ import {
   ArrowLeft, ChevronRight, X, Star, Lightbulb, Database, CloudOff
 } from "lucide-react"
 
+const ICON_MAP = { FileText, Hammer, Video }
+
 export default function NewReviewPage() {
   const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
