@@ -1,6 +1,10 @@
-// 茂林磨课19条评分标准（满分100分）
-// 涵盖：教学准备、教学内容、教学方法、教学效果、教师素养 五大维度
+// 评课标准配置
+// 茂林磨课19条标准（满分100分）—— 用于评教案、评磨课
+// 茂林好课21条标准（满分100分）—— 用于评实录
 
+import { FileText, Hammer, Video } from "lucide-react"
+
+// ==================== 茂林磨课标准（19条，100分） ====================
 export const REVIEW_DIMENSIONS = [
   {
     id: "preparation",
@@ -58,43 +62,137 @@ export const REVIEW_DIMENSIONS = [
   }
 ]
 
+// ==================== 茂林好课标准（21条，100分） ====================
+export const GOOD_CLASS_DIMENSIONS = [
+  {
+    id: "seven_steps",
+    name: "七步教学法",
+    weight: 30,
+    standards: [
+      { id: "s1", name: "练习测错题讲解", description: "高频错题，清晰讲解，能归纳拓展", maxScore: 3 },
+      { id: "s2", name: "进门考/出门考", description: "组织高效，纪律良好", maxScore: 2 },
+      { id: "s3", name: "课堂引入", description: "引入恰当，能够吸引学生，与授课联系紧密", maxScore: 5 },
+      { id: "s4", name: "新课突破", description: "教学目标清晰，有效突破重难点、易错点", maxScore: 7 },
+      { id: "s5", name: "练习巩固", description: "巩固练习设计、讲解合理，帮助学生充分吸收", maxScore: 5 },
+      { id: "s6", name: "总结", description: "引导学生总结方法，举一反三", maxScore: 4 },
+      { id: "s7", name: "作业", description: "作业布置清晰、合理有针对性", maxScore: 4 },
+    ]
+  },
+  {
+    id: "interest",
+    name: "激发兴趣",
+    weight: 20,
+    standards: [
+      { id: "i1", name: "幽默", description: "注重营造课堂幽默氛围，有2-3次笑声，整体课堂氛围轻松，老师面带笑容", maxScore: 5 },
+      { id: "i2", name: "激情", description: "激情，传递正能量，传递好的精气神，声音洪亮、流畅、普通话、抑扬顿挫", maxScore: 5 },
+      { id: "i3", name: "互动", description: "关注每一个学生，状态、心态、有温度，提问语言简明有效/频率、对学生观点的回应质量", maxScore: 5 },
+      { id: "i4", name: "激励", description: "积极鼓励，抓住学生闪光进行合适的表扬，激发兴趣", maxScore: 5 },
+    ]
+  },
+  {
+    id: "inspire",
+    name: "启发式教学",
+    weight: 12,
+    standards: [
+      { id: "h1", name: "问题设计", description: "提问具有层次性（从具体到抽象），能激发学生深度探究，几乎无低效提问（是不是、对不对）", maxScore: 6 },
+      { id: "h2", name: "思维培养", description: "给足学生思考空间，注重追问学生回答思考过程", maxScore: 6 },
+    ]
+  },
+  {
+    id: "habit",
+    name: "培养习惯",
+    weight: 10,
+    standards: [
+      { id: "b1", name: "习惯引导", description: "引导每一个学生坐姿、眼神、笔记、书写、草稿（语言）", maxScore: 5 },
+      { id: "b2", name: "习惯落实", description: "定期检查笔记/草稿，观察课后习惯落实情况（桌面）", maxScore: 5 },
+    ]
+  },
+  {
+    id: "implement",
+    name: "注重落实",
+    weight: 10,
+    standards: [
+      { id: "im1", name: "及时反馈", description: "对学生错误即时纠正，通过重点复述检验学生对知识的理解程度", maxScore: 5 },
+      { id: "im2", name: "高效落实", description: "按时完成课堂目标，课后——过关，学生掌握运用好", maxScore: 5 },
+    ]
+  },
+  {
+    id: "temperament",
+    name: "教师气质",
+    weight: 8,
+    standards: [
+      { id: "t1", name: "仪态仪表", description: "着装整洁大方，教姿教态好", maxScore: 4 },
+      { id: "t2", name: "综合素养", description: "课堂管控，应对能力", maxScore: 4 },
+    ]
+  },
+  {
+    id: "guarantee",
+    name: "教学保障",
+    weight: 5,
+    standards: [
+      { id: "g1", name: "板书设计", description: "板书设计合理精美，零错误，分区板书逻辑清晰，字迹工整，红黑笔使用准确，重点突出", maxScore: 5 },
+    ]
+  },
+  {
+    id: "overall",
+    name: "整体感受",
+    weight: 5,
+    standards: [
+      { id: "o1", name: "整体感受", description: "如你的孩子在本班学习，根据孩子的学习收获你会做其他选择吗？可以接受3分，非常愿意继续学习5分", maxScore: 5 },
+    ]
+  }
+]
+
+// ==================== 通用工具函数 ====================
+
 // 获取所有标准的扁平列表
-export function getAllStandards() {
-  return REVIEW_DIMENSIONS.flatMap(dim =>
+export function getAllStandards(type) {
+  const dimensions = type === "class_recording" ? GOOD_CLASS_DIMENSIONS : REVIEW_DIMENSIONS
+  return dimensions.flatMap(dim =>
     dim.standards.map(s => ({ ...s, dimension: dim.name, dimensionId: dim.id }))
   )
 }
 
 // 验证总分是否为100
-export const TOTAL_MAX_SCORE = getAllStandards().reduce((sum, s) => sum + s.maxScore, 0)
+export const TOTAL_MAX_SCORE = getAllStandards("lesson_plan").reduce((sum, s) => sum + s.maxScore, 0)
+export const GOOD_CLASS_TOTAL_SCORE = getAllStandards("class_recording").reduce((sum, s) => sum + s.maxScore, 0)
 
 // 评课类型
 export const REVIEW_TYPES = {
-  LESSON_PLAN: "评教案",
-  CLASS_RECORDING: "评实录",
   lesson_plan: "评教案",
-  class_recording: "评实录"
+  lesson_polish: "评磨课",
+  class_recording: "评实录",
 }
+
+// 评课类型配置（含图标和描述）
+export const REVIEW_TYPE_OPTIONS = [
+  { value: "lesson_plan", label: "评教案", icon: FileText, desc: "评审教师教案设计（茂林磨课标准）" },
+  { value: "lesson_polish", label: "评磨课", icon: Hammer, desc: "评审磨课过程（茂林磨课标准）" },
+  { value: "class_recording", label: "评实录", icon: Video, desc: "评审课堂实录记录（茂林好课标准）" },
+]
 
 // 达标线
 export const PASS_SCORE = 85
 
 // AI评课提示词模板
 export function buildReviewPrompt(type, teacherName, grade, subject, content) {
-  const allStandards = getAllStandards()
+  const allStandards = getAllStandards(type)
   const standardList = allStandards.map((s, i) =>
     `${i + 1}. ${s.name}（${s.dimension}）：${s.description}（满分${s.maxScore}分）`
   ).join("\n")
 
-  return `你是一位经验丰富的小学数学教学评审专家。请根据茂林磨课标准，对以下${type === "lesson_plan" ? "教案" : "课堂实录"}进行专业评审。
+  const typeName = REVIEW_TYPES[type] || type
+  const standardName = type === "class_recording" ? "茂林好课标准" : "茂林磨课标准"
+
+  return `你是一位经验丰富的小学数学教学评审专家。请根据${standardName}，对以下${typeName}内容进行专业评审。
 
 评审教师：${teacherName}
 年级：${grade}
 学科：数学
-${type === "lesson_plan" ? "教案内容" : "课堂实录内容"}：
+${typeName}内容：
 ${content}
 
-请严格按照以下19条标准逐项评分（每项0-5分），并给出综合评价。
+请严格按照以下${allStandards.length}条标准逐项评分，并给出综合评价。
 
 ${standardList}
 
@@ -111,8 +209,8 @@ ${standardList}
         {
           "id": "<标准ID>",
           "name": "<标准名称>",
-          "score": <得分0-5>,
-          "maxScore": 5,
+          "score": <得分>,
+          "maxScore": <maxScore>,
           "comment": "<简要评语>"
         }
       ],
@@ -122,5 +220,4 @@ ${standardList}
   "overallComment": "<总体评语>",
   "suggestions": ["<改进建议1>", "<改进建议2>", "<改进建议3>"],
   "highlights": ["<亮点1>", "<亮点2>"]
-}`
-}
+}`''

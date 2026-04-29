@@ -5,9 +5,9 @@ import useTeacherStore from "../stores/teacherStore"
 import useReviewStore from "../stores/reviewStore"
 import useSettingsStore from "../stores/settingsStore"
 import { callZhipuReview } from "../api/zhipu"
-import { REVIEW_TYPES, REVIEW_DIMENSIONS, PASS_SCORE } from "../data/reviewStandards"
+import { REVIEW_TYPES, REVIEW_DIMENSIONS, REVIEW_TYPE_OPTIONS, PASS_SCORE } from "../data/reviewStandards"
 import {
-  FileText, Video, Loader2, AlertCircle, CheckCircle2,
+  Loader2, AlertCircle, CheckCircle2,
   ArrowLeft, ChevronRight, X, Star, Lightbulb, Database, CloudOff
 } from "lucide-react"
 
@@ -164,10 +164,7 @@ export default function NewReviewPage() {
           <div>
             <label className="label-text">类型</label>
             <div className="flex gap-3 mt-2">
-              {[
-                { value: "lesson_plan", label: "评教案", icon: FileText, desc: "评审教师教案设计" },
-                { value: "class_recording", label: "评实录", icon: Video, desc: "评审课堂实录记录" },
-              ].map(t => (
+              {REVIEW_TYPE_OPTIONS.map(t => (
                 <button
                   key={t.value}
                   onClick={() => setFormData(f => ({ ...f, type: t.value }))}
@@ -288,7 +285,7 @@ export default function NewReviewPage() {
             <span className="font-medium text-gray-700">{selectedTeacher?.name}</span>
             <span>{formData.grade}</span>
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-              formData.type === "lesson_plan" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"
+              formData.type === "lesson_plan" ? "bg-blue-100 text-blue-700" : formData.type === "lesson_polish" ? "bg-purple-100 text-purple-700" : "bg-green-100 text-green-700"
             }`}>
               {getTypeLabel(formData.type)}
             </span>
