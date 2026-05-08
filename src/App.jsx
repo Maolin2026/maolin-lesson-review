@@ -1,3 +1,4 @@
+// Build: v4 - force rebuild
 import { HashRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { useEffect } from "react"
 import MainLayout from "./components/MainLayout"
