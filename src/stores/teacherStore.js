@@ -4,28 +4,34 @@ const useTeacherStore = create((set, get) => ({
   teachers: [],
   loading: false,
   initialized: false,
+  error: null,
 
-  // 从 WPS 多维表加载教师列表
   fetchTeachers: async () => {
     if (get().loading) return
-    set({ loading: true })
+    set({ loading: true, error: null })
     try {
       const resp = await fetch("/api/teachers")
       const data = await resp.json()
-      if (data.success) {
+      if (data.success && data.teachers) {
         set({ teachers: data.teachers, initialized: true })
+        // 同步到 localStorage
+        localStorage.setItem("lr_teachers", JSON.stringify(data.teachers))
+        return
       }
+      // API 返回错误时 fallback 到本地缓存
+      set({ error: data.error || "加载失败" })
+      fallbackToLocal()
     } catch (err) {
-      console.error("加载教师列表失败:", err)
+      console.warn("从 API 加载教师列表失败，使用本地缓存:", err.message)
+      set({ error: "网络错误，使用本地缓存" })
+      fallbackToLocal()
     } finally {
       set({ loading: false })
     }
   },
 
   getByGrade: (grade) => get().teachers.filter(t => t.grade === grade),
-
   getGroupLeaders: () => get().teachers.filter(t => t.group === "组长"),
-
   getById: (id) => get().teachers.find(t => t.id === id),
 
   addTeacher: async (teacher) => {
@@ -38,11 +44,16 @@ const useTeacherStore = create((set, get) => ({
       })
       const data = await resp.json()
       if (data.success) {
-        set({ teachers: [...get().teachers, newTeacher] })
+        const updated = [...get().teachers, newTeacher]
+        set({ teachers: updated })
+        localStorage.setItem("lr_teachers", JSON.stringify(updated))
         return newTeacher
       }
+      console.error("添加教师失败:", data.error)
+      alert("添加失败: " + (data.error || "未知错误"))
     } catch (err) {
       console.error("添加教师失败:", err)
+      alert("网络错误，请检查网络连接后重试")
     }
     return null
   },
@@ -59,21 +70,34 @@ const useTeacherStore = create((set, get) => ({
       })
       const data = await resp.json()
       if (data.success) {
-        set({
-          teachers: get().teachers.map(t => t.id === id ? merged : t),
-        })
+        const updated = get().teachers.map(t => t.id === id ? merged : t)
+        set({ teachers: updated })
+        localStorage.setItem("lr_teachers", JSON.stringify(updated))
+      } else {
+        console.error("更新教师失败:", data.error)
+        alert("更新失败: " + (data.error || "未知错误"))
       }
     } catch (err) {
       console.error("更新教师失败:", err)
+      alert("网络错误，请检查网络连接后重试")
     }
   },
 
   deleteTeacher: async (id) => {
     try {
-      await fetch(`/api/teachers?id=${id}`, { method: "DELETE" })
-      set({ teachers: get().teachers.filter(t => t.id !== id) })
+      const resp = await fetch(`/api/teachers?id=${id}`, { method: "DELETE" })
+      const data = await resp.json()
+      if (data.success) {
+        const updated = get().teachers.filter(t => t.id !== id)
+        set({ teachers: updated })
+        localStorage.setItem("lr_teachers", JSON.stringify(updated))
+      } else {
+        console.error("删除教师失败:", data.error)
+        alert("删除失败: " + (data.error || "未知错误"))
+      }
     } catch (err) {
       console.error("删除教师失败:", err)
+      alert("网络错误，请检查网络连接后重试")
     }
   },
 
@@ -88,5 +112,22 @@ const useTeacherStore = create((set, get) => ({
     return stats
   },
 }))
+
+function fallbackToLocal() {
+  try {
+    const saved = localStorage.getItem("lr_teachers")
+    if (saved) {
+      const teachers = JSON.parse(saved)
+      if (teachers.length) {
+        set({ teachers, initialized: true })
+        return
+      }
+    }
+  } catch {}
+  // 最终 fallback 到初始数据
+  import("../data/initialTeachers").then(({ INITIAL_TEACHERS }) => {
+    set({ teachers: INITIAL_TEACHERS, initialized: true })
+  })
+}
 
 export default useTeacherStore

@@ -1,4 +1,4 @@
-// Build: v4
+// Build: v5 - async login with API
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import useAuthStore from "../stores/authStore"
@@ -21,8 +21,7 @@ export default function LoginPage() {
     }
     setLoading(true)
     setError("")
-    await new Promise(r => setTimeout(r, 300))
-    const result = login(name.trim(), password.trim())
+    const result = await login(name.trim(), password.trim())
     if (result.success) {
       navigate("/")
     } else {

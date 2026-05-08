@@ -1,5 +1,4 @@
 import { create } from "zustand"
-import { INITIAL_TEACHERS } from "../data/initialTeachers"
 
 const STORAGE_KEY = "lr_auth"
 
@@ -26,21 +25,52 @@ const useAuthStore = create((set, get) => ({
   isAuthenticated: !!initialUser,
   isAdmin: initialUser?.role === "admin",
 
-  login: (name, password) => {
+  login: async (name, password) => {
+    // 尝试从 API 获取教师列表（多维表）
     let teachers = []
     try {
-      const saved = localStorage.getItem("lr_teachers")
-      if (saved) teachers = JSON.parse(saved)
-    } catch {}
-    if (!teachers.length) teachers = INITIAL_TEACHERS
+      const resp = await fetch("/api/teachers")
+      if (resp.ok) {
+        const data = await resp.json()
+        if (data.success && data.teachers?.length) {
+          teachers = data.teachers
+          // 缓存到 localStorage 供离线使用
+          localStorage.setItem("lr_teachers", JSON.stringify(teachers))
+        }
+      }
+    } catch {
+      // API 不可用时 fallback 到本地缓存
+    }
 
-    const found = teachers.find(
-      t => t.name === name && t.password === password
-    )
+    // 本地 fallback
+    if (!teachers.length) {
+      try {
+        const saved = localStorage.getItem("lr_teachers")
+        if (saved) teachers = JSON.parse(saved)
+      } catch {}
+    }
+
+    // 最终 fallback 到初始数据
+    if (!teachers.length) {
+      const { INITIAL_TEACHERS } = await import("../data/initialTeachers")
+      teachers = INITIAL_TEACHERS
+    }
+
+    const found = teachers.find(t => t.name === name && t.password === password)
     if (found) {
-      const userData = { id: found.id, name: found.name, grade: found.grade, role: found.role, group: found.group }
+      const userData = {
+        id: found.id,
+        name: found.name,
+        grade: found.grade,
+        role: found.role,
+        group: found.group,
+      }
       saveAuth(userData)
-      set({ user: userData, isAuthenticated: true, isAdmin: userData.role === "admin" })
+      set({
+        user: userData,
+        isAuthenticated: true,
+        isAdmin: userData.role === "admin",
+      })
       return { success: true, user: userData }
     }
     return { success: false, message: "姓名或密码错误" }
