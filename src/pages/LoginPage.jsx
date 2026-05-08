@@ -1,12 +1,12 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import useAuthStore from "../stores/authStore"
-import { BookOpen, Users, GraduationCap } from "lucide-react"
+import { GraduationCap, Users } from "lucide-react"
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const login = useAuthStore(s => s.login)
-  const [role, setRole] = useState("teacher") // "teacher" | "admin"
+  const [role, setRole] = useState("teacher")
   const [name, setName] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -35,25 +35,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* 品牌区域 */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur rounded-2xl mb-4">
-            <BookOpen className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-white">AI磨课评课系统</h1>
-          <p className="text-primary-200 mt-2">茂林教育 · 小学数学项目组</p>
-        </div>
-
-        {/* 数据亮点 */}
-        <div className="flex justify-center gap-8 mb-8">
-          {[
-            { num: "5", label: "评分维度" },
-            { num: "21", label: "评分子项" },
-            { num: "AI", label: "智能评课" },
-          ].map((item, i) => (
-            <div key={i} className="text-center">
-              <p className="text-2xl font-bold text-white">{item.num}</p>
-              <p className="text-xs text-primary-300">{item.label}</p>
-            </div>
-          ))}
+          <h1 className="text-3xl font-bold text-white">茂林教育</h1>
+          <p className="text-primary-200 mt-2">小学数学项目组</p>
         </div>
 
         {/* 登录卡片 */}
@@ -135,10 +118,6 @@ export default function LoginPage() {
             账号由机构统一分配，如需申请请联系管理员
           </p>
         </div>
-
-        <p className="text-center text-primary-300 text-xs mt-6">
-          茂林教育（湖南常德）教学中心
-        </p>
       </div>
     </div>
   )
